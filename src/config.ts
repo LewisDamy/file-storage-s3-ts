@@ -1,6 +1,6 @@
+import { s3, type S3Client } from "bun";
 import { newDatabase } from "./db/db";
 import type { Database } from "bun:sqlite";
-import { s3, type S3Client } from "bun";
 
 export type ApiConfig = {
   db: Database;
@@ -30,7 +30,7 @@ const client = s3;
 
 export const cfg: ApiConfig = {
   db: db,
-  s3Client, client,
+  s3Client: client,
   jwtSecret: jwtSecret,
   platform: platform,
   filepathRoot: filepathRoot,
