@@ -1,6 +1,8 @@
 import { existsSync, mkdirSync } from "fs";
+import path from "path";
 
 import type { ApiConfig } from "../config";
+import { BadRequestError } from "./errors";
 
 export function ensureAssetsDir(cfg: ApiConfig) {
   if (!existsSync(cfg.assetsRoot)) {
@@ -8,3 +10,19 @@ export function ensureAssetsDir(cfg: ApiConfig) {
   }
 }
 
+
+export function mediaTypeToExt(mediaType: string) {
+  const parts = mediaType.split("/");
+  if (parts.length !== 2) {
+    return ".bin"
+  }
+  return "." + parts[1];
+};
+
+export function getAssetDiskPath(cfg: ApiConfig, assetPath: string) {
+  return path.join(cfg.assetsRoot, assetPath);
+};
+
+export function getAssetURL(cfg: ApiConfig, assetPath: string) {
+  return `http://localhost:${cfg.port}/assets/${assetPath}`
+};
