@@ -1,6 +1,7 @@
 import { getBearerToken, validateJWT } from "../auth";
 import { respondWithJSON } from "./json";
 import { getVideo, updateVideo } from "../db/videos";
+import { getInMemoryURL } from "./assets";
 import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
 import { BadRequestError, NotFoundError, UserForbiddenError } from "./errors";
@@ -45,10 +46,13 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const token = getBearerToken(req.headers);
   const userID = validateJWT(token, cfg.jwtSecret);
 
-  console.log("uploading thumbnail for video", videoId, "by user", userID);
+  const video = getVideo(cfg.db, videoId);
+
+  if (!(video?.userID === userID)) {
+    throw new UserForbiddenError("User is not the video owner");
+  }
 
   const formData = await req.formData();
-
   const file = formData.get("thumbnail");
   if (!(file instanceof File)) {
     throw new BadRequestError("Thumbnail file missing");
@@ -56,28 +60,27 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
   const MAX_UPLOAD_SIZE = 10 << 20;
 
   if (file.size > MAX_UPLOAD_SIZE) {
-    throw new BadRequestError("File is greater than allowed");
+    throw new BadRequestError("Thumbnail file exceeds the maximum allowed size of 10MB");
   }
   const mediaType = file.type;
+  if (!mediaType) {
+    throw new BadRequestError("Missing Content-Type for thumbnail");
+  }
 
-  const imageData = await file.arrayBuffer();
-
-  const videoMetadata = getVideo(cfg.db, videoId);
-
-  if (!(videoMetadata?.userID === userID)) {
-    throw new UserForbiddenError("User is not the video owner");
+  const fileData = await file.arrayBuffer();
+  if (!fileData) {
+    throw new Error("Error reading file data");
   }
 
   videoThumbnails.set(videoId, {
-    data: imageData,
+    data: fileData,
     mediaType
   });
 
-  const thumbnailURL = `http://localhost:${cfg.port}/api/thumbnails/${videoId}`;
+  const urlPath = getInMemoryURL(cfg, videoId);
+  video.thumbnailURL = urlPath;
 
-  videoMetadata.thumbnailURL = thumbnailURL;
+  updateVideo(cfg.db, video);
 
-  updateVideo(cfg.db, videoMetadata);
-
-  return respondWithJSON(200, videoMetadata);
+  return respondWithJSON(200, video);
 }
