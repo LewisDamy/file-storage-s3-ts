@@ -1,5 +1,6 @@
 import { getBearerToken, validateJWT } from "../auth";
 import { respondWithJSON } from "./json";
+import { getAssetDiskPath, getAssetURL, mediaTypeToExt } from "./assets";
 import { getVideo, updateVideo } from "../db/videos";
 import type { ApiConfig } from "../config";
 import type { BunRequest } from "bun";
@@ -32,8 +33,8 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new BadRequestError("Thumbnail file exceeds the maximum allowed size of 10MB");
   }
   const mediaType = file.type;
-  if (!mediaType) {
-    throw new BadRequestError("Missing Content-Type for thumbnail");
+  if (mediaType !== "image/jpeg" && mediaType !== "image/png") {
+    throw new BadRequestError("Invalid type file");
   }
 
   const fileData = await file.arrayBuffer();
@@ -41,10 +42,14 @@ export async function handlerUploadThumbnail(cfg: ApiConfig, req: BunRequest) {
     throw new Error("Error reading file data");
   }
 
-  const base64Encoded = Buffer.from(fileData).toString("base64");
-  const base64DataUrl = `data:${mediaType};base64,${base64Encoded}`;
+  const ext = mediaTypeToExt(mediaType);
+  const filename = `${videoId}${ext}`;
 
-  video.thumbnailURL = base64DataUrl;
+  const assetDiskPath = getAssetDiskPath(cfg, filename);
+  await Bun.write(assetDiskPath, file);
+
+  const urlPath = getAssetURL(cfg, filename);
+  video.thumbnailURL = urlPath;
 
   updateVideo(cfg.db, video);
 
